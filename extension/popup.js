@@ -44,7 +44,7 @@ function render(state) {
     sub.textContent   = "No reCAPTCHA found on this page";
   } else if (s === "solving") {
     title.textContent = "Solving…";
-    sub.textContent   = "Token request sent to local server";
+    sub.textContent   = "Token request sent to server";
   } else if (s === "solved") {
     title.textContent = "Solved ✓";
     sub.textContent   = "Token obtained and delivered to the page";
@@ -52,7 +52,7 @@ function render(state) {
     title.textContent = "Failed";
     sub.textContent   = state.serverOk
       ? "Server returned no token — check server logs"
-      : "Local server is offline (start server.py)";
+      : "Server is offline — check VPS";
   }
 
   // ── Detail values ──────────────────────────────────────────────────────────
