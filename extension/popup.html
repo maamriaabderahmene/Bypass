@@ -140,6 +140,22 @@
     .banner-title { font-weight: 600; font-size: 13px; }
     .banner-sub   { font-size: 11px; color: var(--muted); }
 
+    /* ── Info note ── */
+    .note {
+      font-size: 10.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      padding: 0 2px;
+    }
+    .note code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: 'SF Mono', monospace;
+      font-size: 10px;
+    }
+
     /* ── Button ── */
     .btn {
       width: 100%;
@@ -176,7 +192,7 @@
     <div class="logo-icon">⚡</div>
     <div>
       <div class="logo-name">pioneerfort</div>
-      <div class="logo-sub">reCAPTCHA v3 Bypass</div>
+      <div class="logo-sub">reCAPTCHA v3 Bypass v2.1</div>
     </div>
   </div>
   <div id="srvPill" class="srv-pill err">Offline</div>
@@ -216,6 +232,11 @@
     </div>
   </div>
 
+  <!-- Info note -->
+  <div class="note">
+    Multi-session fix: each tab now gets its own isolated token via request IDs. Run <code>python server.py</code> to start the local server.
+  </div>
+
   <!-- Action button -->
   <button id="refreshBtn" class="btn">↻ &nbsp;Refresh status</button>
 
@@ -223,7 +244,7 @@
 
 <div class="footer">
   <span>pioneerfort © 2026</span>
-  <span id="version">v2.0</span>
+  <span id="version">v2.1</span>
 </div>
 
 <script src="popup.js"></script>

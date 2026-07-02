@@ -1,9 +1,17 @@
 import json
+import random
 import re
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import requests
+
+
+# ── Anti-detection helpers ───────────────────────────────────────────────────
+def _random_jitter(min_ms: int = 200, max_ms: int = 800) -> None:
+    """Add a small random delay to mimic human network variability."""
+    time.sleep(random.randint(min_ms, max_ms) / 1000.0)
 
 
 # Minimal protobuf writer for /api2/reload.
@@ -87,16 +95,33 @@ class ReCaptchaV3Bypass:
         action: str | None = None,
         fingerprint_path: str | None = None,
         max_retries: int = 3,
-        user_agent: str = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) "
-            "Gecko/20100101 Firefox/152.0"
-        ),
+        user_agent: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         self.target_url = target_url
         self.action = action
         self.max_retries = max_retries
+        self.request_id = request_id or f"req_{random.randint(100000, 999999)}"
+
+        # Use provided UA or pick a random realistic one
+        if user_agent:
+            self.user_agent = user_agent
+        else:
+            self.user_agent = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) "
+                "Gecko/20100101 Firefox/152.0"
+            )
+
+        # Create a fresh session per instance — this is critical for
+        # session isolation when multiple tabs make concurrent requests.
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": user_agent})
+        self.session.headers.update({
+            "User-Agent": self.user_agent,
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+        })
+
         self.fingerprint = self._load_fingerprint(fingerprint_path)
 
     @staticmethod
@@ -130,9 +155,11 @@ class ReCaptchaV3Bypass:
 
     def get_response(self) -> requests.Response | None:
         try:
+            # Small jitter before the anchor request
+            _random_jitter(100, 400)
             return self.session.get(self.target_url, timeout=30)
         except requests.exceptions.RequestException as e:
-            print(f"Failed to send GET request: {e}")
+            print(f"[{self.request_id}] Failed to send GET request: {e}")
             return None
 
     def _do_reload(self, recaptcha_token, k_value, co_value, v_value, hl_value) -> str | None:
@@ -153,6 +180,7 @@ class ReCaptchaV3Bypass:
                     "Accept": "*/*",
                     "Origin": "https://www.google.com",
                     "Referer": "https://www.google.com/",
+                    "User-Agent": self.user_agent,
                 },
             }
         else:
@@ -170,9 +198,11 @@ class ReCaptchaV3Bypass:
                 }
             }
         try:
+            # Small jitter before the reload request
+            _random_jitter(200, 600)
             resp = self.session.post(post_url, timeout=30, **kwargs)
         except requests.exceptions.RequestException as e:
-            print(f"Failed to send POST request: {e}")
+            print(f"[{self.request_id}] Failed to send POST request: {e}")
             return None
         return parse_reload_response(resp.text)
 
@@ -185,7 +215,7 @@ class ReCaptchaV3Bypass:
             values = self.extract_values(initial_response)
             recaptcha_token, k_value, co_value, v_value, hl_value = values
             if None in (recaptcha_token, k_value, co_value, v_value):
-                print(f"Attempt {attempt}: failed to extract values.")
+                print(f"[{self.request_id}] Attempt {attempt}: failed to extract values.")
                 continue
 
             if token := self._do_reload(
@@ -193,8 +223,8 @@ class ReCaptchaV3Bypass:
             ):
                 return token
 
-            print(f"Attempt {attempt}: reload returned null, trying anchor token...")
+            print(f"[{self.request_id}] Attempt {attempt}: reload returned null, trying anchor token...")
             return recaptcha_token
 
-        print(f"All {self.max_retries} attempts failed.")
+        print(f"[{self.request_id}] All {self.max_retries} attempts failed.")
         return None

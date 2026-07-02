@@ -6,10 +6,22 @@
   let seq = 0;
   var cachedToken = null;
 
+  // ── Track in-flight requests to prevent response mixing ──
+  const inFlightRequests = new Map();  // id → { done, resolve, timer }
+
+  /**
+   * Generate a unique request ID for each execute call.
+   * This ensures responses are always matched to the correct request,
+   * preventing the "right token goes to wrong session" bug.
+   */
+  function _makeRequestId() {
+    return ++seq;
+  }
+
   // ── Wrap a single execute function ─────────────────────────────────────────
   function wrapExecute(orig, ctx) {
     return function (sitekey, opts) {
-      const id = ++seq;
+      const id = _makeRequestId();
       const action = (opts && opts.action) || "submit";
 
       return new Promise(function (resolve) {
@@ -20,6 +32,7 @@
           done = true;
           clearTimeout(timer);
           window.removeEventListener("message", onResult);
+          inFlightRequests.delete(id);
           resolve(token);
         }
 
@@ -27,27 +40,37 @@
           if (
             !e.data ||
             e.data.type !== PREFIX + "result" ||
+            // CRITICAL: only accept responses matching our request ID
             e.data.id !== id
           )
             return;
           if (e.data.token) {
             finish(e.data.token);
           } else {
+            // Fallback to real grecaptcha if bypass returned no token
             orig.call(ctx, sitekey, opts).then(finish);
           }
         }
 
         window.addEventListener("message", onResult);
 
+        // Store in-flight request for cleanup
+        const timer = setTimeout(function () {
+          window.removeEventListener("message", onResult);
+          inFlightRequests.delete(id);
+          if (!done) {
+            // Timeout — fall back to real grecaptcha
+            orig.call(ctx, sitekey, opts).then(finish);
+          }
+        }, 12000);
+
+        inFlightRequests.set(id, { done: false, timer });
+
+        // Send the solve request to content script
         window.postMessage(
           { type: PREFIX + "solve", sitekey, action, origin: location.origin, id },
           "*"
         );
-
-        const timer = setTimeout(function () {
-          window.removeEventListener("message", onResult);
-          if (!done) orig.call(ctx, sitekey, opts).then(finish);
-        }, 12000);
       });
     };
   }

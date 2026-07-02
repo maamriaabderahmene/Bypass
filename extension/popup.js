@@ -1,14 +1,14 @@
 /**
- * popup.js
+ * popup.js — v2.1 Multi-Session Fix
  *
- * DESIGN RULES (fixing the "storm of /ping requests" bug):
+ * DESIGN RULES:
  *  • The popup NEVER contacts the server directly.
  *  • The popup reads state from background.js via get_state once:
  *      - on DOMContentLoaded
  *      - when the user clicks Refresh
  *  • NO setInterval, NO polling loop of any kind.
- *  • Background.js already caches server health with a 10 s TTL, so even
- *    forcing a fresh check via "force_ping" is cheap and rate-limited.
+ *  • Background.js caches server health with a 10 s TTL.
+ *  • Request ID display shows the correlation ID for the latest token.
  */
 
 const $ = (id) => document.getElementById(id);
@@ -52,7 +52,7 @@ function render(state) {
     title.textContent = "Failed";
     sub.textContent   = state.serverOk
       ? "Server returned no token — check server logs"
-      : "Server is offline — check VPS";
+      : "Server is offline — check that python server.py is running";
   }
 
   // ── Detail values ──────────────────────────────────────────────────────────
