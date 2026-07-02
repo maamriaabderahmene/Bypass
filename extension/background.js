@@ -68,14 +68,6 @@ function makeRequestId(tabId) {
 async function solve(tabId, { site_key, origin, action, hl }) {
   const tab = getTab(tabId);
 
-  // ── CRITICAL FIX: scope tokens by site_key + action ──
-  // If we already have a token for this exact (siteKey, action) pair,
-  // return it immediately instead of making a new request.
-  if (tab.state === "solved" && tab.siteKey === site_key && tab.action === action && tab.token) {
-    console.log(`[bg] Tab ${tabId}: cache hit for ${site_key}:${action}`);
-    return { token: tab.token, requestId: tab.lastRequestId, cached: true };
-  }
-
   // If a request is already in flight for this tab, queue this caller
   // and give them the same result when it completes.
   if (tab.state === "solving") {
@@ -97,7 +89,7 @@ async function solve(tabId, { site_key, origin, action, hl }) {
   try {
     await ensurePing();
     if (!serverOk) {
-      tab.state = "failed";
+      tab.state = "idle";
       _resolvePending(tab, null);
       return { token: null, requestId, error: "server_offline" };
     }
@@ -124,26 +116,26 @@ async function solve(tabId, { site_key, origin, action, hl }) {
     // If the server returns a different request_id, something went wrong.
     if (j && j.request_id && j.request_id !== requestId) {
       console.error(`[bg] Tab ${tabId}: REQUEST MISMATCH! sent=${requestId} got=${j.request_id}`);
-      tab.state = "failed";
+      tab.state = "idle";
       _resolvePending(tab, null);
       return { token: null, requestId, error: "request_mismatch" };
     }
 
     if (j && j.token) {
-      tab.state = "solved";
+      tab.state = "idle";
       tab.token = j.token;
       tab.lastRequestId = requestId;
       console.log(`[bg] Tab ${tabId}: got token for ${requestId}`);
       _resolvePending(tab, j.token);
       return { token: j.token, requestId, cached: false };
     } else {
-      tab.state = "failed";
+      tab.state = "idle";
       console.warn(`[bg] Tab ${tabId}: no token in response for ${requestId}`);
       _resolvePending(tab, null);
       return { token: null, requestId, error: j.error || "no_token" };
     }
   } catch (err) {
-    tab.state = "failed";
+    tab.state = "idle";
     console.error(`[bg] Tab ${tabId}: network error for ${requestId}:`, err);
     _resolvePending(tab, null);
     return { token: null, requestId, error: "network_error" };
@@ -197,16 +189,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // Content script reports a token was used → allow future solves
-  if (msg.type === "token_used") {
-    const tab = getTab(tabId);
-    // Reset state so a new solve can be attempted if needed
-    if (tab.state === "solved") {
-      console.log(`[bg] Tab ${tabId}: token used, resetting for potential re-solve`);
-    }
-    sendResponse({ ok: true });
-    return false;
-  }
+
 });
 
 // ── Cleanup ──────────────────────────────────────────────────────────────────
@@ -225,7 +208,7 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
 chrome.webNavigation.onCompleted.addListener(({ tabId, frameId }) => {
   if (frameId !== 0) return;
   const tab = tabs[tabId];
-  if (tab && tab.state === "solved" && tab.token) {
+  if (tab && tab.token) {
     console.log(`[bg] Tab ${tabId}: page load completed with active token`);
   }
 });

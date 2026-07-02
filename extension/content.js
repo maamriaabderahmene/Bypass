@@ -158,6 +158,11 @@ if (isRecaptchaIframe) {
 
         // Clean up the pending queue
         pendingQueues.delete(cacheKey);
+
+        // If no more pending queues, allow fresh dispatch
+        if (pendingQueues.size === 0) {
+          solveDispatched = false;
+        }
       }
     );
   }
