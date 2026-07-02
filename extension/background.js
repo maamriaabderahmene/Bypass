@@ -14,7 +14,7 @@
  *  • Per-request state tracking ensures tokens never cross between tabs.
  */
 
-const SERVER = "http://127.0.0.1:5000";
+const SERVER = "https://extension.mmpharma.dev";
 
 // ── Server health cache ─────────────────────────────────────────────────────
 let serverOk = false;

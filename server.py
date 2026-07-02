@@ -316,11 +316,11 @@ def main():
         daemon_threads = True
 
     port = 5000
-    server = ThreadedHTTPServer(("127.0.0.1", port), Handler)
+    server = ThreadedHTTPServer(("0.0.0.0", port), Handler)
     log.info("=" * 60)
     log.info("Bypass Server v2.1 — Multi-Session Fix + Anti-Detection")
     log.info("Features: request IDs, session isolation, jitter, UA rotation")
-    log.info("Running on http://127.0.0.1:%d", port)
+    log.info("Running on http://0.0.0.0:%d", port)
     log.info("Press Ctrl-C to stop.")
     log.info("=" * 60)
     try:
